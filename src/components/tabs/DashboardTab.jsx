@@ -539,7 +539,7 @@ const DashboardTab = () => {
                     }}
                   />
                   <Bar dataKey="donors" fill="hsl(var(--primary))" name="Donors" />
-                  <Bar dataKey="stock" fill="hsl(var(--secondary))" name="Stock" />
+                  <Bar dataKey="stock" fill="#6366f1" name="Stock" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
