@@ -77,12 +77,10 @@ export const useAuthStore = create((set, get) => ({
 
   // Initialize auth state on store creation
   initializeAuth: async () => {
-    console.log("initializeAuth: Starting...");
     set({ isAuthLoading: true });
     
     try {
       const token = localStorage.getItem("token");
-      console.log("initializeAuth: Token exists:", !!token);
       
       if (token) {
         // Call checkAuth but don't let it set isAuthLoading again
@@ -90,7 +88,6 @@ export const useAuthStore = create((set, get) => ({
         if (currentState.isAuthLoading) {
           try {
             const { user } = await authService.validateToken();
-            console.log("initializeAuth: Token valid, user:", user);
             set({ user, isAuthenticated: true, isAuthLoading: false });
           } catch (error) {
             console.error("initializeAuth: Token validation failed:", error.message);
@@ -101,7 +98,6 @@ export const useAuthStore = create((set, get) => ({
           }
         }
       } else {
-        console.log("initializeAuth: No token, setting unauthenticated");
         set({ 
           user: null, 
           isAuthenticated: false, 
@@ -116,8 +112,6 @@ export const useAuthStore = create((set, get) => ({
         isAuthLoading: false 
       });
     }
-    
-    console.log("initializeAuth: Complete, final state:", get());
   },
 
   clearError: () => set({ error: null }),

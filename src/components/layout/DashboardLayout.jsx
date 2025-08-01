@@ -72,21 +72,21 @@ const DashboardLayout = () => {
     <div className="min-h-screen bg-gradient-to-br from-background to-medical-red/5">
       {/* Header */}
       <header className="bg-card/95 backdrop-blur-sm border-b border-border shadow-card">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-medical rounded-full flex items-center justify-center">
-                <Heart className="w-6 h-6 text-white" />
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+          <div className="flex justify-between items-center h-14 sm:h-16">
+            <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-medical rounded-full flex items-center justify-center flex-shrink-0">
+                <Heart className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-foreground">{t('bloodBankManagement')}</h1>
-                <p className="text-sm text-muted-foreground">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg sm:text-xl font-bold text-foreground truncate">{t('bloodBankManagement')}</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">
                   {t('welcome')}{getUserEmail() ? `, ${getUserEmail()}` : ''}
                 </p>
               </div>
             </div>
 
-            <div className="hidden md:flex items-center space-x-4">
+            <div className="hidden md:flex items-center space-x-3 lg:space-x-4 flex-shrink-0">
               <Button
                 variant="ghost"
                 size="sm"
@@ -97,7 +97,9 @@ const DashboardLayout = () => {
                 <span className="text-xs">{i18n.language === 'en' ? 'FR' : 'EN'}</span>
               </Button>
               {getUserEmail() && (
-                <span className="text-sm text-muted-foreground">{getUserEmail()}</span>
+                <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-32">
+                  {getUserEmail()}
+                </span>
               )}
               <Button
                 onClick={handleLogout}
@@ -106,15 +108,16 @@ const DashboardLayout = () => {
                 className="flex items-center space-x-2"
               >
                 <LogOut className="w-4 h-4" />
-                <span>{t('logout')}</span>
+                <span className="hidden lg:inline">{t('logout')}</span>
               </Button>
             </div>
 
-            <div className="md:hidden">
+            <div className="md:hidden flex-shrink-0">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="p-2"
               >
                 {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </Button>
@@ -131,16 +134,18 @@ const DashboardLayout = () => {
               exit={{ opacity: 0, height: 0 }}
               className="md:hidden border-t border-border bg-card/95"
             >
-              <div className="px-4 py-2 space-y-2">
-                <div className="flex items-center justify-between py-2">
+              <div className="px-3 sm:px-4 py-3 space-y-3">
+                <div className="flex items-center justify-between">
                   {getUserEmail() && (
-                    <span className="text-sm text-muted-foreground">{getUserEmail()}</span>
+                    <span className="text-xs sm:text-sm text-muted-foreground truncate flex-1 mr-2">
+                      {getUserEmail()}
+                    </span>
                   )}
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={toggleLanguage}
-                    className="flex items-center space-x-1"
+                    className="flex items-center space-x-1 flex-shrink-0"
                   >
                     <Globe className="w-4 h-4" />
                     <span className="text-xs">{i18n.language === 'en' ? 'FR' : 'EN'}</span>
@@ -162,24 +167,27 @@ const DashboardLayout = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* Password Change Banner for Blood Managers */}
         {showPasswordBanner && user?.role === 'blood_manager' && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 shadow-sm"
+            className="mb-4 sm:mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:p-4 shadow-sm"
           >
-            <div className="flex items-start justify-between">
-              <div className="flex items-start space-x-3 flex-1">
-                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <User className="w-4 h-4 text-white" />
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start space-x-2 sm:space-x-3 flex-1 min-w-0">
+                <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <User className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">First Time Login</h4>
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    If this is your first time accessing your account, please change your password under the <strong>Blood Managers</strong> tab for security.
+                  <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                    First Time Login
+                  </h4>
+                  <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200">
+                    If this is your first time accessing your account, please change your password under the{' '}
+                    <strong>Blood Managers</strong> tab for security.
                   </p>
                 </div>
               </div>
@@ -187,7 +195,7 @@ const DashboardLayout = () => {
                 variant="ghost"
                 size="sm"
                 onClick={dismissPasswordBanner}
-                className="text-blue-600 hover:text-blue-800 hover:bg-blue-100 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-800/20 p-1 h-auto ml-2 flex-shrink-0"
+                className="text-blue-600 hover:text-blue-800 hover:bg-blue-100 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-800/20 p-1 h-auto flex-shrink-0"
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -195,17 +203,17 @@ const DashboardLayout = () => {
           </motion.div>
         )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           {/* Desktop Tab Navigation */}
           <div className="hidden sm:block">
-            <TabsList className="grid w-full grid-cols-5 bg-card/50 backdrop-blur-sm">
+            <TabsList className="grid w-full grid-cols-5 bg-card/50 backdrop-blur-sm h-auto p-1">
               {tabs.map((tab) => (
                 <TabsTrigger
                   key={tab.id}
                   value={tab.id}
-                  className="data-[state=active]:bg-gradient-medical data-[state=active]:text-white"
+                  className="data-[state=active]:bg-gradient-medical data-[state=active]:text-white text-xs sm:text-sm py-2 sm:py-3 px-2 sm:px-4"
                 >
-                  {tab.label}
+                  <span className="truncate">{tab.label}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -214,16 +222,16 @@ const DashboardLayout = () => {
           {/* Mobile Tab Navigation - Dropdown */}
           <div className="sm:hidden">
             <Select value={activeTab} onValueChange={setActiveTab}>
-              <SelectTrigger className="w-full bg-card/50 backdrop-blur-sm">
+              <SelectTrigger className="w-full bg-card/50 backdrop-blur-sm h-12">
                 <SelectValue>
-                  <span className="flex items-center">
+                  <span className="flex items-center text-sm">
                     {currentTab?.label}
                   </span>
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {tabs.map((tab) => (
-                  <SelectItem key={tab.id} value={tab.id}>
+                  <SelectItem key={tab.id} value={tab.id} className="text-sm">
                     {tab.label}
                   </SelectItem>
                 ))}
@@ -232,7 +240,7 @@ const DashboardLayout = () => {
           </div>
 
           {tabs.map((tab) => (
-            <TabsContent key={tab.id} value={tab.id} className="space-y-6">
+            <TabsContent key={tab.id} value={tab.id} className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
               <tab.component />
             </TabsContent>
           ))}

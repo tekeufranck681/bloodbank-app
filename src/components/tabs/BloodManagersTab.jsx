@@ -97,12 +97,6 @@ const BloodManagersTab = () => {
     return () => clearError();
   }, [clearError]);
 
-  // Add this useEffect to debug the user object
-  useEffect(() => {
-    console.log('Current user object:', user);
-    console.log('Managers:', managers);
-  }, [user, managers]);
-
   const filteredManagers = managers.filter(manager =>
     manager.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     manager.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -114,13 +108,6 @@ const BloodManagersTab = () => {
     
     const userEmail = getUserEmail();
     const managerEmail = manager.email;
-    
-    console.log('User comparison:', { 
-      userEmail, 
-      managerEmail, 
-      userObject: user,
-      match: userEmail === managerEmail 
-    });
     
     return userEmail && managerEmail && userEmail === managerEmail;
   };

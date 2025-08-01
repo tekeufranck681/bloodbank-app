@@ -28,9 +28,11 @@ import { useStockStore } from '@/stores/stockStore';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const DashboardTab = () => {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   
   // Filter states
   const [startDate, setStartDate] = useState('');
@@ -122,6 +124,10 @@ const DashboardTab = () => {
   const totalDonations = filteredDonations.length;
   const totalVolume = filteredDonations.reduce((sum, donation) => sum + (donation.volume_ml || 0), 0);
   const availableStock = filteredStocks.filter(s => s.status === 'available').length;
+  const nearExpiryStock = filteredStocks.filter(s => s.status === 'near to expiry').length;
+  const expiredStock = filteredStocks.filter(s => s.status === 'expired').length;
+  const reservedStock = filteredStocks.filter(s => s.status === 'reserved').length;
+  const totalStock = filteredStocks.length;
   const totalManagers = donors.length; // Replace with actual managers count when available
 
   // Get unique values for filters
@@ -169,11 +175,11 @@ const DashboardTab = () => {
 
   const monthlyData = getMonthlyData();
 
-  // Stock status distribution
+  // Stock status distribution - use real data from store
   const stockStatusData = [
     { name: 'Available', value: filteredStocks.filter(s => s.status === 'available').length, color: '#10b981' },
     { name: 'Reserved', value: filteredStocks.filter(s => s.status === 'reserved').length, color: '#f59e0b' },
-    { name: 'Used', value: filteredStocks.filter(s => s.status === 'used').length, color: '#6b7280' },
+    { name: 'Near to Expiry', value: filteredStocks.filter(s => s.status === 'near to expiry').length, color: '#f97316' },
     { name: 'Expired', value: filteredStocks.filter(s => s.status === 'expired').length, color: '#ef4444' },
   ];
 
@@ -182,12 +188,9 @@ const DashboardTab = () => {
     .sort((a, b) => new Date(b.donation_date || b.created_at) - new Date(a.donation_date || a.created_at))
     .slice(0, 5);
 
-  // Stock alerts (expired or near expiry)
+  // Stock alerts (expired or near expiry) - use real status from data
   const stockAlerts = filteredStocks.filter(stock => {
-    const expiryDate = new Date(stock.expiry_date);
-    const today = new Date();
-    const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
-    return stock.status === 'expired' || daysUntilExpiry <= 7;
+    return stock.status === 'expired' || stock.status === 'near to expiry';
   });
 
   const exportToPDF = () => {
@@ -525,23 +528,85 @@ const DashboardTab = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={bloodTypeData}>
+              <ResponsiveContainer width="100%" height={isMobile ? 200 : 250}>
+                <BarChart data={bloodTypeData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="bloodType" fontSize={12} />
-                  <YAxis fontSize={12} />
+                  <XAxis dataKey="bloodType" fontSize={isMobile ? 10 : 12} />
+                  <YAxis fontSize={isMobile ? 10 : 12} />
                   <Tooltip 
+                    active={true}
+                    position={{ x: isMobile ? 10 : undefined, y: isMobile ? 10 : undefined }}
                     contentStyle={{
                       backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px',
-                      fontSize: '12px'
+                      fontSize: isMobile ? '11px' : '12px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                     }}
                   />
-                  <Bar dataKey="donors" fill="hsl(var(--primary))" name="Donors" />
-                  <Bar dataKey="stock" fill="#6366f1" name="Stock" />
+                  <Bar 
+                    dataKey="donors" 
+                    fill="hsl(var(--primary))" 
+                    name="Donors"
+                    stroke={isMobile ? "hsl(var(--primary))" : undefined}
+                    strokeWidth={isMobile ? 1 : 0}
+                  />
+                  <Bar 
+                    dataKey="stock" 
+                    fill="#6366f1" 
+                    name="Stock"
+                    stroke={isMobile ? "#6366f1" : undefined}
+                    strokeWidth={isMobile ? 1 : 0}
+                  />
                 </BarChart>
               </ResponsiveContainer>
+              
+              {/* Mobile data highlights */}
+              {isMobile && (
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                    <span>Blood Type</span>
+                    <div className="flex gap-4">
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 bg-primary rounded"></div>
+                        <span>Donors</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded" style={{backgroundColor: '#6366f1'}}></div>
+                        <span>Stock</span>
+                      </div>
+                    </div>
+                  </div>
+                  {bloodTypeData.map((item) => (
+                    <div key={item.bloodType} className="bg-muted/30 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-sm">{item.bloodType}</span>
+                        <div className="flex gap-3 text-xs">
+                          <span className="text-primary font-medium">{item.donors} donors</span>
+                          <span className="font-medium" style={{color: '#6366f1'}}>{item.stock} units</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="flex-1 bg-background rounded-full h-2 overflow-hidden">
+                          <div 
+                            className="h-full bg-primary transition-all duration-300"
+                            style={{ width: `${Math.max((item.donors / Math.max(...bloodTypeData.map(d => d.donors))) * 100, 5)}%` }}
+                          />
+                        </div>
+                        <div className="flex-1 bg-background rounded-full h-2 overflow-hidden">
+                          <div 
+                            className="h-full transition-all duration-300"
+                            style={{ 
+                              width: `${Math.max((item.stock / Math.max(...bloodTypeData.map(d => d.stock))) * 100, 5)}%`,
+                              backgroundColor: '#6366f1'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -556,31 +621,69 @@ const DashboardTab = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={isMobile ? 200 : 250}>
                 <PieChart>
                   <Pie
                     data={stockStatusData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={40}
-                    outerRadius={100}
+                    innerRadius={isMobile ? 30 : 40}
+                    outerRadius={isMobile ? 80 : 100}
                     paddingAngle={5}
                     dataKey="value"
+                    stroke={isMobile ? "#fff" : undefined}
+                    strokeWidth={isMobile ? 2 : 0}
                   >
                     {stockStatusData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip 
+                    active={true}
                     contentStyle={{
                       backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px',
-                      fontSize: '12px'
+                      fontSize: isMobile ? '11px' : '12px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                     }}
                   />
                 </PieChart>
               </ResponsiveContainer>
+              
+              {/* Mobile status highlights */}
+              {isMobile && (
+                <div className="mt-4 space-y-2">
+                  {stockStatusData.map((item) => (
+                    <div key={item.name} className="bg-muted/30 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-4 h-4 rounded-full flex-shrink-0" 
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="font-medium text-sm">{item.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-bold text-lg">{item.value}</span>
+                          <div className="text-xs text-muted-foreground">
+                            {((item.value / stockStatusData.reduce((sum, s) => sum + s.value, 0)) * 100).toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 bg-background rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="h-full transition-all duration-300"
+                          style={{ 
+                            width: `${Math.max((item.value / Math.max(...stockStatusData.map(s => s.value))) * 100, 5)}%`,
+                            backgroundColor: item.color
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -597,22 +700,74 @@ const DashboardTab = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={monthlyData}>
+              <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
+                <LineChart data={monthlyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
+                  <XAxis dataKey="month" fontSize={isMobile ? 10 : 12} />
+                  <YAxis fontSize={isMobile ? 10 : 12} />
                   <Tooltip 
+                    active={true}
                     contentStyle={{
                       backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      borderRadius: '8px',
+                      fontSize: isMobile ? '11px' : '12px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                     }}
                   />
-                  <Line type="monotone" dataKey="donations" stroke="hsl(var(--primary))" name="Donations" />
-                  <Line type="monotone" dataKey="volume" stroke="hsl(var(--secondary))" name="Volume (ml)" />
+                  <Line 
+                    type="monotone" 
+                    dataKey="donations" 
+                    stroke="hsl(var(--primary))" 
+                    name="Donations"
+                    strokeWidth={isMobile ? 3 : 3}
+                    dot={{ r: isMobile ? 4 : 4, fill: "hsl(var(--primary))", strokeWidth: 2, stroke: "#fff" }}
+                    activeDot={{ r: isMobile ? 6 : 6, fill: "hsl(var(--primary))" }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="volume" 
+                    stroke="#6366f1" 
+                    name="Volume (ml)"
+                    strokeWidth={isMobile ? 3 : 3}
+                    dot={{ r: isMobile ? 4 : 4, fill: "#6366f1", strokeWidth: 2, stroke: "#fff" }}
+                    activeDot={{ r: isMobile ? 6 : 6, fill: "#6366f1" }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
+              
+              {/* Mobile trend highlights */}
+              {isMobile && (
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center justify-center gap-4 text-xs">
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-primary rounded-full"></div>
+                      <span>Donations</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full" style={{backgroundColor: '#6366f1'}}></div>
+                      <span>Volume (ml)</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {monthlyData.map((item, index) => (
+                      <div key={index} className="bg-muted/30 rounded-lg p-2">
+                        <div className="text-xs font-medium text-center mb-1">{item.month}</div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-primary">Donations:</span>
+                            <span className="font-medium">{item.donations}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span style={{color: '#6366f1'}}>Volume:</span>
+                            <span className="font-medium">{item.volume}ml</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
