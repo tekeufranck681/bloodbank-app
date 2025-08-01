@@ -16,35 +16,13 @@ const AppContent = () => {
 
   // Initialize auth on mount
   useEffect(() => {
-    console.log("App mounting, initializing auth...");
-    console.log("Initial auth state:", { isAuthenticated, isAuthLoading });
-    
-    initializeAuth().then(() => {
-      console.log("Auth initialization complete");
-      const finalState = useAuthStore.getState();
-      console.log("Final auth state:", { 
-        isAuthenticated: finalState.isAuthenticated, 
-        isAuthLoading: finalState.isAuthLoading,
-        user: finalState.user 
-      });
-    }).catch((error) => {
+    initializeAuth().catch((error) => {
       console.error("Auth initialization error:", error);
-      const errorState = useAuthStore.getState();
-      console.log("Error auth state:", { 
-        isAuthenticated: errorState.isAuthenticated, 
-        isAuthLoading: errorState.isAuthLoading 
-      });
     });
   }, [initializeAuth]);
 
-  // Log state changes
-  useEffect(() => {
-    console.log("Auth state changed:", { isAuthenticated, isAuthLoading });
-  }, [isAuthenticated, isAuthLoading]);
-
   // Show loading spinner while checking authentication
   if (isAuthLoading) {
-    console.log("App is loading auth state...");
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-medical-red/5">
         <div className="text-center">

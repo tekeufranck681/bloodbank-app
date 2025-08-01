@@ -31,7 +31,6 @@ api.interceptors.response.use(
 
     // Only logout on 401 if we have a token and it's not a verify-token request
     if (status === 401 && token && !error.config?.url?.includes('/verify-token')) {
-      console.log("Token expired during API call, logging out");
       logout();
     }
 

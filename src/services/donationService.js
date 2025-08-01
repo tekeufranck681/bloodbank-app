@@ -49,12 +49,6 @@ export const donationService = {
 
       const queryString = params.toString();
       const url = queryString ? `/?${queryString}` : '/';
-      
-      console.log('=== DONATION SERVICE DEBUG ===');
-      console.log('Filters received:', filters);
-      console.log('Query params:', queryString);
-      console.log('Final URL:', url);
-      console.log('==============================');
 
       const response = await donationsApi.get(url);
       const data = response.data;

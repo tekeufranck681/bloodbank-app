@@ -24,7 +24,7 @@ const DashboardLayout = () => {
   // Check if user is blood manager and should see password change banner
   useEffect(() => {
     if (user && user.role === 'blood_manager') {
-      const bannerDismissed = localStorage.getItem(`password-banner-dismissed-${user.email || user.sub}`);
+      const bannerDismissed = sessionStorage.getItem(`password-banner-dismissed-${user.email || user.sub}`);
       if (!bannerDismissed) {
         setShowPasswordBanner(true);
       }
@@ -34,7 +34,7 @@ const DashboardLayout = () => {
   const dismissPasswordBanner = () => {
     const userEmail = getUserEmail();
     if (userEmail) {
-      localStorage.setItem(`password-banner-dismissed-${userEmail}`, 'true');
+      sessionStorage.setItem(`password-banner-dismissed-${userEmail}`, 'true');
     }
     setShowPasswordBanner(false);
   };
