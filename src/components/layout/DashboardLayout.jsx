@@ -10,6 +10,8 @@ import BloodManagersTab from '@/components/tabs/BloodManagersTab';
 import DonorsTab from '@/components/tabs/DonorsTab';
 import DonationsTab from '@/components/tabs/DonationsTab';
 import StockManagementTab from '@/components/tabs/StockManagementTab';
+import ForecastTab from '@/components/tabs/ForecastTab';
+import OptimizationTab from '@/components/tabs/OptimizationTab';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 
@@ -64,6 +66,8 @@ const DashboardLayout = () => {
     { id: 'donors', label: t('donors'), component: DonorsTab },
     { id: 'donations', label: t('donations'), component: DonationsTab },
     { id: 'stock', label: t('stockManagement'), component: StockManagementTab },
+    { id: 'forecast', label: 'Forecast', component: ForecastTab },
+    { id: 'optimization', label: 'Optimization', component: OptimizationTab },
   ];
 
   const currentTab = tabs.find(tab => tab.id === activeTab);
@@ -206,7 +210,7 @@ const DashboardLayout = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           {/* Desktop Tab Navigation */}
           <div className="hidden sm:block">
-            <TabsList className="grid w-full grid-cols-5 bg-card/50 backdrop-blur-sm h-auto p-1">
+            <TabsList className="grid w-full grid-cols-7 bg-card/50 backdrop-blur-sm h-auto p-1">
               {tabs.map((tab) => (
                 <TabsTrigger
                   key={tab.id}

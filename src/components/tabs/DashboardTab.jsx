@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { motion } from 'framer-motion';
 import { Users, Heart, Droplet, Package, TrendingUp, AlertTriangle, Calendar, Download, Filter } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +23,7 @@ import {
   Line
 } from 'recharts';
 import { BloodTypeBadge, StatusBadge } from '@/components/ui/badge-status';
+import { Badge } from '@/components/ui/badge';
 import { useDonorStore } from '@/stores/donorStore';
 import { useDonationStore } from '@/stores/donationStore';
 import { useStockStore } from '@/stores/stockStore';
@@ -29,6 +31,16 @@ import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useForecastStore } from '@/stores/forecastStore';
+import { useOptimizeStore } from '@/stores/optimizeStore';
+import DashboardSkeleton from '@/components/dashboard/DashboardSkeleton';
+import SummaryCardsSkeleton from '@/components/dashboard/SummaryCardsSkeleton';
+
+// Lazy load heavy components
+const ForecastSummaryCard = lazy(() => import('@/components/dashboard/ForecastSummaryCard'));
+const OptimizationSummaryCard = lazy(() => import('@/components/dashboard/OptimizationSummaryCard'));
+const CombinedAnalyticsCard = lazy(() => import('@/components/dashboard/CombinedAnalyticsCard'));
+const ChartsSection = lazy(() => import('@/components/dashboard/ChartsSection'));
 
 const DashboardTab = () => {
   const { toast } = useToast();
@@ -64,6 +76,21 @@ const DashboardTab = () => {
     getStockStats
   } = useStockStore();
 
+  // Add forecast and optimization stores
+  const {
+    latestForecast,
+    isLoading: forecastLoading,
+    error: forecastError,
+    fetchLatestForecast
+  } = useForecastStore();
+
+  const {
+    latestOptimization,
+    isLoading: optimizationLoading,
+    error: optimizationError,
+    fetchLatestOptimization
+  } = useOptimizeStore();
+
   // Load data on component mount
   useEffect(() => {
     const loadData = async () => {
@@ -71,7 +98,9 @@ const DashboardTab = () => {
         await Promise.all([
           fetchDonors(),
           fetchDonations(),
-          fetchStocks()
+          fetchStocks(),
+          fetchLatestForecast('1d'), // Default to daily forecast
+          fetchLatestOptimization('1d') // Default to daily optimization
         ]);
       } catch (error) {
         toast({
@@ -83,7 +112,7 @@ const DashboardTab = () => {
     };
 
     loadData();
-  }, [fetchDonors, fetchDonations, fetchStocks, toast]);
+  }, [fetchDonors, fetchDonations, fetchStocks, fetchLatestForecast, fetchLatestOptimization, toast]);
 
   // Calculate filtered data based on current filters
   const getFilteredData = () => {
@@ -268,7 +297,9 @@ const DashboardTab = () => {
           donation.donor?.full_name || 
           donors.find(d => d.id === donation.donor_id)?.full_name || 
           'Unknown',
-          donation.blood_type || 'Unknown',
+          donation.blood_type || 
+          donors.find(d => d.id === donation.donor_id)?.blood_type || 
+          'Unknown',
           `${donation.volume_ml || 0}ml`,
           new Date(donation.donation_date || donation.created_at).toLocaleDateString()
         ]);
@@ -301,8 +332,8 @@ const DashboardTab = () => {
     }
   };
 
-  const isLoading = donorsLoading || donationsLoading || stocksLoading;
-  const hasError = donorsError || donationsError || stocksError;
+  const isLoading = donorsLoading || donationsLoading || stocksLoading || forecastLoading || optimizationLoading;
+  const hasError = donorsError || donationsError || stocksError || forecastError || optimizationError;
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -319,15 +350,9 @@ const DashboardTab = () => {
     visible: { opacity: 1, y: 0 }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading dashboard data...</p>
-        </div>
-      </div>
-    );
+  // Show skeleton while initial data is loading
+  if (donorsLoading && donationsLoading && stocksLoading) {
+    return <DashboardSkeleton />;
   }
 
   if (hasError) {
@@ -383,51 +408,56 @@ const DashboardTab = () => {
     >
       {/* Header with Filters */}
       <motion.div variants={itemVariants}>
-        <div className="flex flex-col gap-4 mb-6 px-4 sm:px-0">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="flex-1 min-w-0">
-              <h2 className="text-2xl sm:text-3xl font-bold text-foreground truncate">Dashboard</h2>
-              <p className="text-sm sm:text-base text-muted-foreground">Overview of blood bank operations</p>
+        <div className="flex flex-col gap-4 mb-4 sm:mb-6 px-2 sm:px-4 lg:px-0">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+            <div className="flex-1 min-w-0 w-full sm:w-auto">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground truncate">Dashboard</h2>
+              <p className="text-xs sm:text-sm lg:text-base text-muted-foreground mt-1">Overview of blood bank operations</p>
             </div>
             <Button 
               variant="outline"
               onClick={exportToPDF}
-              className="flex items-center gap-2 w-full sm:w-auto flex-shrink-0"
+              className="flex items-center gap-2 w-full sm:w-auto flex-shrink-0 h-9 sm:h-10 text-xs sm:text-sm"
             >
-              <Download className="w-4 h-4" />
-              <span>Export Report</span>
+              <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline">Export Report</span>
+              <span className="xs:hidden">Export</span>
             </Button>
           </div>
         </div>
 
-        {/* Filters */}
-        <Card className="border-0 shadow-card mx-4 sm:mx-0">
-          <CardContent className="p-3 sm:p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* Filters Card */}
+        <Card className="border-0 shadow-card mx-2 sm:mx-4 lg:mx-0 mb-4 sm:mb-6">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <Filter className="h-4 w-4 text-primary" />
+              <h3 className="text-sm sm:text-base font-medium">Filters</h3>
+            </div>
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div className="space-y-1">
-                <Label htmlFor="startDate" className="text-xs sm:text-sm font-medium">Start Date</Label>
+                <Label className="text-xs sm:text-sm font-medium">Start Date</Label>
                 <Input
                   id="startDate"
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="text-sm w-full"
+                  className="text-xs sm:text-sm w-full h-9 sm:h-10"
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="endDate" className="text-xs sm:text-sm font-medium">End Date</Label>
+                <Label className="text-xs sm:text-sm font-medium">End Date</Label>
                 <Input
                   id="endDate"
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="text-sm w-full"
+                  className="text-xs sm:text-sm w-full h-9 sm:h-10"
                 />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs sm:text-sm font-medium">Blood Type</Label>
                 <Select value={bloodTypeFilter} onValueChange={setBloodTypeFilter}>
-                  <SelectTrigger className="text-sm w-full">
+                  <SelectTrigger className="text-xs sm:text-sm w-full h-9 sm:h-10">
                     <SelectValue placeholder="All Blood Types" />
                   </SelectTrigger>
                   <SelectContent>
@@ -441,7 +471,7 @@ const DashboardTab = () => {
               <div className="space-y-1">
                 <Label className="text-xs sm:text-sm font-medium">Location</Label>
                 <Select value={locationFilter} onValueChange={setLocationFilter}>
-                  <SelectTrigger className="text-sm w-full">
+                  <SelectTrigger className="text-xs sm:text-sm w-full h-9 sm:h-10">
                     <SelectValue placeholder="All Locations" />
                   </SelectTrigger>
                   <SelectContent>
@@ -458,16 +488,16 @@ const DashboardTab = () => {
       </motion.div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 px-4 sm:px-0">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-6 px-2 sm:px-4 lg:px-0 mb-4 sm:mb-6">
         <motion.div variants={itemVariants}>
           <Card className="border shadow-md bg-blue-500">
-            <CardContent className="p-3 sm:p-6">
+            <CardContent className="p-2 sm:p-3 lg:p-6">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-white text-xs sm:text-sm font-medium truncate">Blood Managers</p>
-                  <p className="text-lg sm:text-2xl font-bold text-white">{totalManagers}</p>
+                  <p className="text-base sm:text-lg lg:text-2xl font-bold text-white">{totalManagers}</p>
                 </div>
-                <Users className="h-6 w-6 sm:h-8 sm:w-8 text-white flex-shrink-0" />
+                <Users className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-white flex-shrink-0" />
               </div>
             </CardContent>
           </Card>
@@ -475,13 +505,13 @@ const DashboardTab = () => {
 
         <motion.div variants={itemVariants}>
           <Card className="border shadow-md bg-red-500">
-            <CardContent className="p-3 sm:p-6">
+            <CardContent className="p-2 sm:p-3 lg:p-6">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-white text-xs sm:text-sm font-medium truncate">Total Donors</p>
-                  <p className="text-lg sm:text-2xl font-bold text-white">{totalDonors}</p>
+                  <p className="text-base sm:text-lg lg:text-2xl font-bold text-white">{totalDonors}</p>
                 </div>
-                <Heart className="h-6 w-6 sm:h-8 sm:w-8 text-white flex-shrink-0" />
+                <Heart className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-white flex-shrink-0" />
               </div>
             </CardContent>
           </Card>
@@ -489,13 +519,13 @@ const DashboardTab = () => {
 
         <motion.div variants={itemVariants}>
           <Card className="border shadow-md bg-green-500">
-            <CardContent className="p-3 sm:p-6">
+            <CardContent className="p-2 sm:p-3 lg:p-6">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-white text-xs sm:text-sm font-medium truncate">Total Donations</p>
-                  <p className="text-lg sm:text-2xl font-bold text-white">{totalDonations}</p>
+                  <p className="text-base sm:text-lg lg:text-2xl font-bold text-white">{totalDonations}</p>
                 </div>
-                <Droplet className="h-6 w-6 sm:h-8 sm:w-8 text-white flex-shrink-0" />
+                <Droplet className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-white flex-shrink-0" />
               </div>
             </CardContent>
           </Card>
@@ -503,289 +533,92 @@ const DashboardTab = () => {
 
         <motion.div variants={itemVariants}>
           <Card className="border shadow-md bg-purple-500">
-            <CardContent className="p-3 sm:p-6">
+            <CardContent className="p-2 sm:p-3 lg:p-6">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-white text-xs sm:text-sm font-medium truncate">Available Stock</p>
-                  <p className="text-lg sm:text-2xl font-bold text-white">{availableStock}</p>
+                  <p className="text-base sm:text-lg lg:text-2xl font-bold text-white">{availableStock}</p>
                 </div>
-                <Package className="h-6 w-6 sm:h-8 sm:w-8 text-white flex-shrink-0" />
+                <Package className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-white flex-shrink-0" />
               </div>
             </CardContent>
           </Card>
         </motion.div>
       </div>
 
+      {/* Forecast, Optimization & Analytics Row */}
+      <Suspense fallback={<SummaryCardsSkeleton />}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 px-2 sm:px-4 lg:px-0 mb-4 sm:mb-6">
+          {/* Forecast Summary */}
+          <motion.div variants={itemVariants}>
+            <ForecastSummaryCard 
+              forecastData={latestForecast}
+              selectedPeriod="1d"
+            />
+          </motion.div>
+
+          {/* Optimization Summary */}
+          <motion.div variants={itemVariants}>
+            <OptimizationSummaryCard 
+              optimizationData={latestOptimization}
+              selectedPeriod="1d"
+            />
+          </motion.div>
+
+          {/* Combined Analytics */}
+          <motion.div variants={itemVariants} className="md:col-span-2 lg:col-span-1">
+            <CombinedAnalyticsCard 
+              forecastData={latestForecast}
+              optimizationData={latestOptimization}
+              stockData={filteredStocks}
+              selectedPeriod="1d"
+            />
+          </motion.div>
+        </div>
+      </Suspense>
+
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 px-4 sm:px-0">
-        {/* Blood Type Distribution */}
-        <motion.div variants={itemVariants}>
-          <Card className="border-0 shadow-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
-                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                Blood Type Distribution
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={isMobile ? 200 : 250}>
-                <BarChart data={bloodTypeData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="bloodType" fontSize={isMobile ? 10 : 12} />
-                  <YAxis fontSize={isMobile ? 10 : 12} />
-                  <Tooltip 
-                    active={true}
-                    position={{ x: isMobile ? 10 : undefined, y: isMobile ? 10 : undefined }}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                      fontSize: isMobile ? '11px' : '12px',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                    }}
-                  />
-                  <Bar 
-                    dataKey="donors" 
-                    fill="hsl(var(--primary))" 
-                    name="Donors"
-                    stroke={isMobile ? "hsl(var(--primary))" : undefined}
-                    strokeWidth={isMobile ? 1 : 0}
-                  />
-                  <Bar 
-                    dataKey="stock" 
-                    fill="#6366f1" 
-                    name="Stock"
-                    stroke={isMobile ? "#6366f1" : undefined}
-                    strokeWidth={isMobile ? 1 : 0}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-              
-              {/* Mobile data highlights */}
-              {isMobile && (
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                    <span>Blood Type</span>
-                    <div className="flex gap-4">
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 bg-primary rounded"></div>
-                        <span>Donors</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded" style={{backgroundColor: '#6366f1'}}></div>
-                        <span>Stock</span>
-                      </div>
-                    </div>
-                  </div>
-                  {bloodTypeData.map((item) => (
-                    <div key={item.bloodType} className="bg-muted/30 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-sm">{item.bloodType}</span>
-                        <div className="flex gap-3 text-xs">
-                          <span className="text-primary font-medium">{item.donors} donors</span>
-                          <span className="font-medium" style={{color: '#6366f1'}}>{item.stock} units</span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <div className="flex-1 bg-background rounded-full h-2 overflow-hidden">
-                          <div 
-                            className="h-full bg-primary transition-all duration-300"
-                            style={{ width: `${Math.max((item.donors / Math.max(...bloodTypeData.map(d => d.donors))) * 100, 5)}%` }}
-                          />
-                        </div>
-                        <div className="flex-1 bg-background rounded-full h-2 overflow-hidden">
-                          <div 
-                            className="h-full transition-all duration-300"
-                            style={{ 
-                              width: `${Math.max((item.stock / Math.max(...bloodTypeData.map(d => d.stock))) * 100, 5)}%`,
-                              backgroundColor: '#6366f1'
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+      <Suspense fallback={
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6 px-2 sm:px-4 lg:px-0 mb-4 sm:mb-6">
+          {[1, 2].map((i) => (
+            <Card key={i} className="border-0 shadow-card">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 sm:h-5 sm:w-5 bg-muted animate-pulse rounded" />
+                  <div className="h-4 sm:h-5 w-32 sm:w-40 bg-muted animate-pulse rounded" />
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Stock Status Distribution */}
-        <motion.div variants={itemVariants}>
-          <Card className="border-0 shadow-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
-                <Package className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                Stock Status Distribution
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={isMobile ? 200 : 250}>
-                <PieChart>
-                  <Pie
-                    data={stockStatusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={isMobile ? 30 : 40}
-                    outerRadius={isMobile ? 80 : 100}
-                    paddingAngle={5}
-                    dataKey="value"
-                    stroke={isMobile ? "#fff" : undefined}
-                    strokeWidth={isMobile ? 2 : 0}
-                  >
-                    {stockStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    active={true}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                      fontSize: isMobile ? '11px' : '12px',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              
-              {/* Mobile status highlights */}
-              {isMobile && (
-                <div className="mt-4 space-y-2">
-                  {stockStatusData.map((item) => (
-                    <div key={item.name} className="bg-muted/30 rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-4 h-4 rounded-full flex-shrink-0" 
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <span className="font-medium text-sm">{item.name}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-bold text-lg">{item.value}</span>
-                          <div className="text-xs text-muted-foreground">
-                            {((item.value / stockStatusData.reduce((sum, s) => sum + s.value, 0)) * 100).toFixed(1)}%
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-2 bg-background rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="h-full transition-all duration-300"
-                          style={{ 
-                            width: `${Math.max((item.value / Math.max(...stockStatusData.map(s => s.value))) * 100, 5)}%`,
-                            backgroundColor: item.color
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      {/* Monthly Donations Trend */}
-      {monthlyData.length > 0 && (
-        <motion.div variants={itemVariants}>
-          <Card className="border-0 shadow-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                Monthly Donations Trend
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
-                <LineChart data={monthlyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" fontSize={isMobile ? 10 : 12} />
-                  <YAxis fontSize={isMobile ? 10 : 12} />
-                  <Tooltip 
-                    active={true}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                      fontSize: isMobile ? '11px' : '12px',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                    }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="donations" 
-                    stroke="hsl(var(--primary))" 
-                    name="Donations"
-                    strokeWidth={isMobile ? 3 : 3}
-                    dot={{ r: isMobile ? 4 : 4, fill: "hsl(var(--primary))", strokeWidth: 2, stroke: "#fff" }}
-                    activeDot={{ r: isMobile ? 6 : 6, fill: "hsl(var(--primary))" }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="volume" 
-                    stroke="#6366f1" 
-                    name="Volume (ml)"
-                    strokeWidth={isMobile ? 3 : 3}
-                    dot={{ r: isMobile ? 4 : 4, fill: "#6366f1", strokeWidth: 2, stroke: "#fff" }}
-                    activeDot={{ r: isMobile ? 6 : 6, fill: "#6366f1" }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-              
-              {/* Mobile trend highlights */}
-              {isMobile && (
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center justify-center gap-4 text-xs">
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 bg-primary rounded-full"></div>
-                      <span>Donations</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full" style={{backgroundColor: '#6366f1'}}></div>
-                      <span>Volume (ml)</span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {monthlyData.map((item, index) => (
-                      <div key={index} className="bg-muted/30 rounded-lg p-2">
-                        <div className="text-xs font-medium text-center mb-1">{item.month}</div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-primary">Donations:</span>
-                            <span className="font-medium">{item.donations}</span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                            <span style={{color: '#6366f1'}}>Volume:</span>
-                            <span className="font-medium">{item.volume}ml</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+              </CardHeader>
+              <CardContent>
+                <div className="h-48 sm:h-56 lg:h-64 w-full bg-muted animate-pulse rounded" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      }>
+        <div className="px-2 sm:px-4 lg:px-0 mb-4 sm:mb-6">
+          <ChartsSection
+            bloodTypeData={bloodTypeData}
+            stockStatusData={stockStatusData}
+            monthlyData={monthlyData}
+            isMobile={isMobile}
+            itemVariants={itemVariants}
+          />
+        </div>
+      </Suspense>
 
       {/* Recent Activity and Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 px-4 sm:px-0">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6 px-2 sm:px-4 lg:px-0">
         {/* Recent Donations */}
         <motion.div variants={itemVariants}>
           <Card className="border-0 shadow-card">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2 sm:pb-3">
               <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
                 <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 Recent Donations
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="p-3 sm:p-6">
+              <div className="space-y-2 sm:space-y-3">
                 {recentDonations.length > 0 ? (
                   recentDonations.map((donation) => (
                     <div key={donation.donation_id} className="flex items-center justify-between p-2 sm:p-3 bg-muted/50 rounded-lg">
@@ -815,7 +648,7 @@ const DashboardTab = () => {
                     </div>
                   ))
                 ) : (
-                  <p className="text-muted-foreground text-center py-4 text-sm">No recent donations</p>
+                  <p className="text-muted-foreground text-center py-4 text-xs sm:text-sm">No recent donations</p>
                 )}
               </div>
             </CardContent>
@@ -825,33 +658,170 @@ const DashboardTab = () => {
         {/* Stock Alerts */}
         <motion.div variants={itemVariants}>
           <Card className="border-0 shadow-card">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2 sm:pb-3">
               <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
                 <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-status-near-expiry" />
                 Stock Alerts
+                {stockAlerts.length > 0 && (
+                  <Badge variant="destructive" className="ml-auto text-xs">
+                    {stockAlerts.length}
+                  </Badge>
+                )}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="p-3 sm:p-6">
+              <div className="space-y-2 sm:space-y-3">
                 {stockAlerts.length > 0 ? (
-                  stockAlerts.map((stock) => (
-                    <div key={stock.id} className="flex items-center justify-between p-2 sm:p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                        <BloodTypeBadge bloodType={stock.blood_type} />
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-xs sm:text-sm truncate">{stock.location || 'Unknown Location'}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Expires: {new Date(stock.expiry_date).toLocaleDateString()}
-                          </p>
-                        </div>
+                  <>
+                    {/* Priority Summary */}
+                    <div className="grid grid-cols-2 gap-2 mb-3 sm:mb-4">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-center">
+                        <p className="text-xs text-red-600 font-medium">Expired</p>
+                        <p className="text-sm sm:text-lg font-bold text-red-700">
+                          {stockAlerts.filter(s => s.status === 'expired').length}
+                        </p>
                       </div>
-                      <div className="flex-shrink-0 ml-2">
-                        <StatusBadge status={stock.status} />
+                      <div className="bg-orange-50 border border-orange-200 rounded-lg p-2 text-center">
+                        <p className="text-xs text-orange-600 font-medium">Near Expiry</p>
+                        <p className="text-sm sm:text-lg font-bold text-orange-700">
+                          {stockAlerts.filter(s => s.status === 'near to expiry').length}
+                        </p>
                       </div>
                     </div>
-                  ))
+
+                    {/* Alert Items */}
+                    <div className="max-h-48 sm:max-h-64 overflow-y-auto space-y-2">
+                      {stockAlerts
+                        .sort((a, b) => {
+                          if (a.status === 'expired' && b.status !== 'expired') return -1;
+                          if (b.status === 'expired' && a.status !== 'expired') return 1;
+                          return new Date(a.expiry_date) - new Date(b.expiry_date);
+                        })
+                        .map((stock) => {
+                          const daysUntilExpiry = Math.ceil(
+                            (new Date(stock.expiry_date) - new Date()) / (1000 * 60 * 60 * 24)
+                          );
+                          const isExpired = stock.status === 'expired';
+                          
+                          return (
+                            <div 
+                              key={stock.id} 
+                              className={`flex flex-col sm:flex-row sm:items-center justify-between p-2 sm:p-3 rounded-lg border-l-4 gap-2 sm:gap-0 ${
+                                isExpired 
+                                  ? 'bg-red-50 border-l-red-500 border border-red-200' 
+                                  : 'bg-orange-50 border-l-orange-500 border border-orange-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                                <BloodTypeBadge bloodType={stock.blood_type} />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="font-medium text-xs sm:text-sm truncate">
+                                      {stock.location || 'Unknown Location'}
+                                    </p>
+                                    {isExpired && (
+                                      <Badge variant="destructive" className="text-xs">
+                                        EXPIRED
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>
+                                      {isExpired 
+                                        ? `Expired ${Math.abs(daysUntilExpiry)} days ago`
+                                        : `Expires in ${daysUntilExpiry} days`
+                                      }
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Unit ID: {stock.id.slice(0, 8)}... • {stock.volume_ml || 450}ml
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 sm:gap-1 flex-shrink-0">
+                                <StatusBadge status={stock.status} />
+                                <div className="flex gap-1">
+                                  {isExpired ? (
+                                    <Button 
+                                      size="sm" 
+                                      variant="destructive" 
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => {
+                                        toast({
+                                          title: 'Action Required',
+                                          description: `Remove expired unit ${stock.id.slice(0, 8)}`,
+                                          variant: 'destructive'
+                                        });
+                                      }}
+                                    >
+                                      Remove
+                                    </Button>
+                                  ) : (
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      className="h-6 px-2 text-xs border-orange-300 text-orange-700 hover:bg-orange-50"
+                                      onClick={() => {
+                                        toast({
+                                          title: 'Priority Use',
+                                          description: `Mark unit ${stock.id.slice(0, 8)} for priority use`,
+                                          variant: 'default'
+                                        });
+                                      }}
+                                    >
+                                      Priority
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1 text-xs"
+                        onClick={() => {
+                          const expiredCount = stockAlerts.filter(s => s.status === 'expired').length;
+                          toast({
+                            title: 'Bulk Action',
+                            description: `Process ${expiredCount} expired units for removal`,
+                            variant: 'default'
+                          });
+                        }}
+                      >
+                        Process Expired ({stockAlerts.filter(s => s.status === 'expired').length})
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1 text-xs"
+                        onClick={() => {
+                          const nearExpiryCount = stockAlerts.filter(s => s.status === 'near to expiry').length;
+                          toast({
+                            title: 'Priority Distribution',
+                            description: `Mark ${nearExpiryCount} units for priority distribution`,
+                            variant: 'default'
+                          });
+                        }}
+                      >
+                        Priority Use ({stockAlerts.filter(s => s.status === 'near to expiry').length})
+                      </Button>
+                    </div>
+                  </>
                 ) : (
-                  <p className="text-muted-foreground text-center py-4 text-sm">No stock alerts</p>
+                  <div className="text-center py-4 sm:py-6">
+                    <div className="mx-auto w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-full flex items-center justify-center mb-2 sm:mb-3">
+                      <Package className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
+                    </div>
+                    <p className="text-xs sm:text-sm font-medium text-green-800 mb-1">All Stock Healthy</p>
+                    <p className="text-xs text-green-600">No expired or near-expiry alerts</p>
+                  </div>
                 )}
               </div>
             </CardContent>

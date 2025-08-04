@@ -50,7 +50,7 @@ export const HEMOGLOBIN_CONSTRAINTS = {
 // Volume constraints (typical blood donation volumes)
 export const VOLUME_CONSTRAINTS = {
   MIN: 200,
-  MAX: 500,
+  MAX: 600,
   STANDARD: 450
 };
 
