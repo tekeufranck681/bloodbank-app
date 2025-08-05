@@ -42,12 +42,31 @@ export const authService = {
         throw new Error("No token found");
       }
 
-      // Make sure we're using the correct API instance for token validation
-      const response = await api.post("/verify-token", {}, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      // Try both APIs to validate token since we don't know user type yet
+      let response;
+      let isBloodManager = false;
+      
+      try {
+        // First try auth API for admin users
+        response = await api.post("/verify-token", {}, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+      } catch (authError) {
+        // If auth API fails, try blood manager API
+        try {
+          response = await api1.post("/verify-token", {}, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          isBloodManager = true;
+        } catch (managerError) {
+          // If both fail, throw the original auth error
+          throw authError;
         }
-      });
+      }
       
       if (response.data.status !== "success") {
         throw new Error("Token invalid or expired");
