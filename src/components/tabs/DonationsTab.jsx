@@ -465,22 +465,61 @@ const DonationsTab = () => {
         ? `Upload completed with some issues: ${result.created_donations.length} donations created, ${result.failed_rows.length} rows failed.`
         : `Upload successful: ${result.created_donations.length} donations created from ${result.total_rows_processed} rows.`;
 
-      toast({
+      const successToast = toast({
         title: result.status === 'partial_success' ? 'Partial Success' : 'Upload Successful',
         description: successMessage,
         variant: result.status === 'partial_success' ? 'default' : 'default',
+        duration: 8000, // Increased duration
+        action: result.status === 'partial_success' && result.failed_rows?.length > 0 ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              successToast.dismiss();
+              // Show detailed failed rows
+              const failedRowsDetails = result.failed_rows.map((row, index) => 
+                `Row ${row.row_number || index + 1}: ${row.error || 'Unknown error'}`
+              ).join('\n');
+              
+              toast({
+                title: `Failed Rows Details (${result.failed_rows.length} rows)`,
+                description: (
+                  <div className="max-h-40 overflow-y-auto">
+                    <pre className="text-xs whitespace-pre-wrap font-mono">
+                      {failedRowsDetails}
+                    </pre>
+                  </div>
+                ),
+                variant: "destructive",
+                duration: 15000, // Long duration for reading
+                action: (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Copy to clipboard
+                      navigator.clipboard.writeText(failedRowsDetails);
+                      toast({
+                        title: 'Copied',
+                        description: 'Failed rows details copied to clipboard',
+                        duration: 3000,
+                      });
+                    }}
+                  >
+                    Copy
+                  </Button>
+                ),
+              });
+            }}
+          >
+            View Details
+          </Button>
+        ) : undefined,
       });
 
-      // Show failed rows details if any
+      // Show failed rows details if any (fallback)
       if (result.failed_rows && result.failed_rows.length > 0) {
-        setTimeout(() => {
-          toast({
-            title: 'Failed Rows Details',
-            description: `${result.failed_rows.length} rows failed processing. Check console for details.`,
-            variant: "destructive",
-          });
-          console.log('Failed rows:', result.failed_rows);
-        }, 2000);
+        console.log('Failed rows details:', result.failed_rows);
       }
 
     } catch (error) {
@@ -488,6 +527,7 @@ const DonationsTab = () => {
         title: 'Upload Failed',
         description: error.message || 'An error occurred during file upload.',
         variant: "destructive",
+        duration: 8000, // Increased duration
       });
     } finally {
       clearInterval(progressInterval);
