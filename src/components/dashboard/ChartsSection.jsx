@@ -206,17 +206,23 @@ const ChartsSection = ({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-primary" />
-                Monthly Donations Trend
+                Monthly Blood Collection Summary
               </CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
-                <LineChart data={monthlyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" fontSize={isMobile ? 10 : 12} />
-                  <YAxis fontSize={isMobile ? 10 : 12} />
+                  <XAxis 
+                    dataKey="month" 
+                    fontSize={isMobile ? 10 : 12}
+                    tick={{ fill: 'hsl(var(--foreground))' }}
+                  />
+                  <YAxis 
+                    fontSize={isMobile ? 10 : 12}
+                    tick={{ fill: 'hsl(var(--foreground))' }}
+                  />
                   <Tooltip 
-                    active={true}
                     contentStyle={{
                       backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
@@ -224,25 +230,45 @@ const ChartsSection = ({
                       fontSize: isMobile ? '11px' : '12px',
                       boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                     }}
+                    formatter={(value, name) => [
+                      name === 'donations' ? `${value} donations` : `${value.toLocaleString()}ml`,
+                      name === 'donations' ? 'Total Donations' : 'Total Volume'
+                    ]}
                   />
-                  <Line 
-                    type="monotone" 
+                  <Bar 
                     dataKey="donations" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: isMobile ? 3 : 4 }}
-                    name="Donations"
+                    fill="hsl(var(--primary))" 
+                    name="donations"
+                    radius={[4, 4, 0, 0]}
                   />
-                  <Line 
-                    type="monotone" 
+                  <Bar 
                     dataKey="volume" 
-                    stroke="#6366f1" 
-                    strokeWidth={2}
-                    dot={{ fill: '#6366f1', strokeWidth: 2, r: isMobile ? 3 : 4 }}
-                    name="Volume (ml)"
+                    fill="#10b981" 
+                    name="volume"
+                    radius={[4, 4, 0, 0]}
                   />
-                </LineChart>
+                </BarChart>
               </ResponsiveContainer>
+              
+              {/* Summary stats for mobile */}
+              {isMobile && monthlyData.length > 0 && (
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="bg-primary/10 rounded-lg p-3 text-center">
+                    <p className="text-sm text-muted-foreground">This Month</p>
+                    <p className="text-lg font-bold text-primary">
+                      {monthlyData[monthlyData.length - 1]?.donations || 0}
+                    </p>
+                    <p className="text-xs text-muted-foreground">donations</p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-3 text-center">
+                    <p className="text-sm text-muted-foreground">Volume</p>
+                    <p className="text-lg font-bold text-green-600">
+                      {(monthlyData[monthlyData.length - 1]?.volume || 0).toLocaleString()}ml
+                    </p>
+                    <p className="text-xs text-muted-foreground">collected</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

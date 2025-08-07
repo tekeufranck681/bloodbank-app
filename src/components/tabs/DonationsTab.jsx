@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Eye, Edit, Filter, Calendar, Droplet, User, X, Loader2 } from 'lucide-react';
+import { Plus, Search, Eye, Edit, Filter, Calendar, Droplet, User, X, Loader2, Upload, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import { BloodTypeBadge, StatusBadge } from '@/components/ui/badge-status';
 import { BloodTypeEnum } from '@/constants/donorConstants';
 import { 
@@ -74,6 +75,11 @@ const DonationsTab = () => {
   });
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // File upload states
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef(null);
   
   // Store hooks
   const {
@@ -84,6 +90,7 @@ const DonationsTab = () => {
     searchDonations,
     createDonation,
     updateDonation,
+    uploadDonationsFile,
     clearError
   } = useDonationStore();
 
@@ -394,6 +401,105 @@ const DonationsTab = () => {
     }
   };
 
+  // File upload handlers
+  const handleFileUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['.csv', '.xlsx', '.xls', '.docx', '.pdf'];
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    
+    if (!allowedTypes.includes(fileExtension)) {
+      toast({
+        title: 'Invalid File Type',
+        description: 'Please select a CSV, Excel, Word, or PDF file.',
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast({
+        title: 'File Too Large',
+        description: 'Please select a file smaller than 10MB.',
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    // Show upload start confirmation
+    toast({
+      title: 'Upload Started',
+      description: `Processing ${file.name}...`,
+    });
+
+    // Simulate progress for better UX
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 200);
+
+    try {
+      const result = await uploadDonationsFile(file);
+      
+      // Complete progress
+      setUploadProgress(100);
+      
+      // Show success message with details
+      const successMessage = result.status === 'partial_success' 
+        ? `Upload completed with some issues: ${result.created_donations.length} donations created, ${result.failed_rows.length} rows failed.`
+        : `Upload successful: ${result.created_donations.length} donations created from ${result.total_rows_processed} rows.`;
+
+      toast({
+        title: result.status === 'partial_success' ? 'Partial Success' : 'Upload Successful',
+        description: successMessage,
+        variant: result.status === 'partial_success' ? 'default' : 'default',
+      });
+
+      // Show failed rows details if any
+      if (result.failed_rows && result.failed_rows.length > 0) {
+        setTimeout(() => {
+          toast({
+            title: 'Failed Rows Details',
+            description: `${result.failed_rows.length} rows failed processing. Check console for details.`,
+            variant: "destructive",
+          });
+          console.log('Failed rows:', result.failed_rows);
+        }, 2000);
+      }
+
+    } catch (error) {
+      toast({
+        title: 'Upload Failed',
+        description: error.message || 'An error occurred during file upload.',
+        variant: "destructive",
+      });
+    } finally {
+      clearInterval(progressInterval);
+      setIsUploading(false);
+      setUploadProgress(0);
+      // Clear the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <motion.div
       variants={containerVariants}
@@ -407,13 +513,44 @@ const DonationsTab = () => {
           <h2 className="text-3xl font-bold text-foreground">Donations</h2>
           <p className="text-muted-foreground">Track and manage blood donations</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-medical hover:shadow-medical transition-all duration-300">
-              <Plus className="w-4 h-4 mr-2" />
-              Record Donation
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-3">
+          {/* File Upload Button */}
+          <Button 
+            variant="outline"
+            onClick={handleFileUploadClick}
+            disabled={isUploading}
+            className="border-primary text-primary hover:bg-primary hover:text-white transition-all duration-300"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4 mr-2" />
+                Upload File
+              </>
+            )}
+          </Button>
+          
+          {/* Hidden File Input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls,.docx,.pdf"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          {/* Record Donation Button */}
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-medical hover:shadow-medical transition-all duration-300">
+                <Plus className="w-4 h-4 mr-2" />
+                Record Donation
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Record New Donation</DialogTitle>
@@ -512,7 +649,34 @@ const DonationsTab = () => {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </motion.div>
+
+      {/* Upload Progress Modal */}
+      {isUploading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-96 mx-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Uploading Donations File
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Progress</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <Progress value={uploadProgress} className="h-2" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Processing file and creating donation records...
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Filters */}
       <motion.div variants={itemVariants}>

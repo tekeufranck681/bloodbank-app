@@ -104,5 +104,29 @@ export const donationService = {
     } catch (error) {
       normalizeError(error, "Failed to search donations");
     }
-  }
+  },
+
+  // Upload donations file
+  uploadFile: async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      console.log('=== UPLOAD DONATIONS FILE DEBUG ===');
+      console.log('File:', file.name);
+      console.log('File size:', file.size);
+      console.log('File type:', file.type);
+      console.log('====================================');
+
+      const response = await donationsApi.post('/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      normalizeError(error, "Failed to upload donations file");
+    }
+  },
 };

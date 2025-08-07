@@ -148,4 +148,21 @@ export const useDonationStore = create((set, get) => ({
 
   // Clear donations (useful when switching contexts)
   clearDonations: () => set({ donations: [], selectedDonation: null }),
+
+  // Upload donations file
+  uploadDonationsFile: async (file) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await donationService.uploadFile(file);
+      
+      // Refresh donations list after successful upload
+      await get().fetchDonations();
+      
+      set({ isLoading: false });
+      return result;
+    } catch (error) {
+      set({ isLoading: false, error: error.message });
+      throw error;
+    }
+  },
 }));
